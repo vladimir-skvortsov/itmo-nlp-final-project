@@ -101,12 +101,8 @@ class TypedMarkersREModel(nn.Module):
         Returns:
             Tuple of ``(subj_ids, obj_ids)`` dicts mapping type → token id.
         """
-        subj_ids = {
-            t: tokenizer_vocab[SUBJ_START_TMPL.format(type=t)] for t in entity_types
-        }
-        obj_ids = {
-            t: tokenizer_vocab[OBJ_START_TMPL.format(type=t)] for t in entity_types
-        }
+        subj_ids = {t: tokenizer_vocab[SUBJ_START_TMPL.format(type=t)] for t in entity_types}
+        obj_ids = {t: tokenizer_vocab[OBJ_START_TMPL.format(type=t)] for t in entity_types}
         return subj_ids, obj_ids
 
     def forward(
@@ -144,22 +140,26 @@ class TypedMarkersREModel(nn.Module):
         batch_size = input_ids.size(0)
 
         # Gather the hidden state at each example's subject and object markers.
-        subj_pos = torch.stack([
-            _find_marker_position(input_ids[i : i + 1], subj_marker_ids[i].item())
-            for i in range(batch_size)
-        ]).squeeze(-1)
-        obj_pos = torch.stack([
-            _find_marker_position(input_ids[i : i + 1], obj_marker_ids[i].item())
-            for i in range(batch_size)
-        ]).squeeze(-1)
+        subj_pos = torch.stack(
+            [
+                _find_marker_position(input_ids[i : i + 1], subj_marker_ids[i].item())
+                for i in range(batch_size)
+            ]
+        ).squeeze(-1)
+        obj_pos = torch.stack(
+            [
+                _find_marker_position(input_ids[i : i + 1], obj_marker_ids[i].item())
+                for i in range(batch_size)
+            ]
+        ).squeeze(-1)
 
         subj_repr = hidden_states[torch.arange(batch_size), subj_pos]  # (batch, hidden)
-        obj_repr = hidden_states[torch.arange(batch_size), obj_pos]    # (batch, hidden)
+        obj_repr = hidden_states[torch.arange(batch_size), obj_pos]  # (batch, hidden)
 
         combined = self.dropout(torch.cat([subj_repr, obj_repr], dim=-1))  # (batch, 2*hidden)
         logits = self.classifier(combined)
 
-        result: dict[str, torch.Tensor] = {"logits": logits}
+        result: dict[str, torch.Tensor] = {'logits': logits}
         if labels is not None:
-            result["loss"] = nn.CrossEntropyLoss()(logits, labels)
+            result['loss'] = nn.CrossEntropyLoss()(logits, labels)
         return result

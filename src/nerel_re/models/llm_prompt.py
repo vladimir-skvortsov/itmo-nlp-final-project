@@ -92,8 +92,8 @@ class LLMRelationExtractor:
         Returns:
             Full prompt string including system instructions and few-shot demos.
         """
-        parts = [_SYSTEM_PROMPT, "\n"]
-        parts.append(f"Allowed relations: {json.dumps(self.config.allowed_relations)}\n\n")
+        parts = [_SYSTEM_PROMPT, '\n']
+        parts.append(f'Allowed relations: {json.dumps(self.config.allowed_relations)}\n\n')
 
         for demo in self.few_shot_examples[: self.config.n_few_shot]:
             parts.append(
@@ -116,7 +116,7 @@ class LLMRelationExtractor:
                 obj_text=example.entity2.text,
             )
         )
-        return "".join(parts)
+        return ''.join(parts)
 
     def _call_mlx(self, prompt: str) -> str:
         """Invoke the MLX CLI to generate a response.
@@ -128,11 +128,15 @@ class LLMRelationExtractor:
             Raw text output from the model.
         """
         cmd = [
-            "mlx_lm.generate",
-            "--model", self.config.model_path,
-            "--prompt", prompt,
-            "--max-tokens", str(self.config.max_new_tokens),
-            "--temp", str(self.config.temperature),
+            'mlx_lm.generate',
+            '--model',
+            self.config.model_path,
+            '--prompt',
+            prompt,
+            '--max-tokens',
+            str(self.config.max_new_tokens),
+            '--temp',
+            str(self.config.temperature),
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)  # noqa: S603
         return result.stdout.strip()
@@ -149,9 +153,9 @@ class LLMRelationExtractor:
         """
         try:
             # Find the first JSON object in the output.
-            start = raw.index("{")
-            end = raw.rindex("}") + 1
+            start = raw.index('{')
+            end = raw.rindex('}') + 1
             data = json.loads(raw[start:end])
-            return str(data.get("relation", NO_RELATION))
-        except (ValueError, KeyError, json.JSONDecodeError):
+            return str(data.get('relation', NO_RELATION))
+        except ValueError, KeyError, json.JSONDecodeError:
             return NO_RELATION

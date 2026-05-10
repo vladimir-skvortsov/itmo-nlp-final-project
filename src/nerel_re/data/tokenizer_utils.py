@@ -23,16 +23,16 @@ if TYPE_CHECKING:
 # embedding; [e2_TYPE] token for the object entity embedding.
 # ---------------------------------------------------------------------------
 
-SUBJ_START_TMPL = "[e1_{type}]"
-SUBJ_END_TMPL = "[/e1_{type}]"
-OBJ_START_TMPL = "[e2_{type}]"
-OBJ_END_TMPL = "[/e2_{type}]"
+SUBJ_START_TMPL = '[e1_{type}]'
+SUBJ_END_TMPL = '[/e1_{type}]'
+OBJ_START_TMPL = '[e2_{type}]'
+OBJ_END_TMPL = '[/e2_{type}]'
 
 # Plain markers used by the baseline (no type information).
-PLAIN_SUBJ_START = "[E1]"
-PLAIN_SUBJ_END = "[/E1]"
-PLAIN_OBJ_START = "[E2]"
-PLAIN_OBJ_END = "[/E2]"
+PLAIN_SUBJ_START = '[E1]'
+PLAIN_SUBJ_END = '[/E1]'
+PLAIN_OBJ_START = '[E2]'
+PLAIN_OBJ_END = '[/E2]'
 
 
 def get_typed_marker_tokens(entity_types: list[str]) -> list[str]:
@@ -150,7 +150,7 @@ def encode_example(
     return tokenizer(
         marked_text,
         max_length=max_length,
-        padding="max_length",
+        padding='max_length',
         truncation=True,
-        return_tensors="pt",
+        return_tensors='pt',
     )

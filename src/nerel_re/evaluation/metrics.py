@@ -31,31 +31,32 @@ def compute_metrics(
     """
     if not y_true:
         return {
-            "macro_f1": 0.0, "macro_precision": 0.0, "macro_recall": 0.0,
-            "micro_f1": 0.0, "accuracy": 0.0,
+            'macro_f1': 0.0,
+            'macro_precision': 0.0,
+            'macro_recall': 0.0,
+            'micro_f1': 0.0,
+            'accuracy': 0.0,
         }
 
     # Labels to include in macro averaging (exclude no_relation).
     relation_labels = [idx for idx, lbl in id2label.items() if lbl != NO_RELATION]
 
-    macro_f1 = f1_score(y_true, y_pred, labels=relation_labels, average="macro", zero_division=0)
+    macro_f1 = f1_score(y_true, y_pred, labels=relation_labels, average='macro', zero_division=0)
     macro_p = precision_score(
-        y_true, y_pred, labels=relation_labels, average="macro", zero_division=0
+        y_true, y_pred, labels=relation_labels, average='macro', zero_division=0
     )
-    macro_r = recall_score(
-        y_true, y_pred, labels=relation_labels, average="macro", zero_division=0
-    )
-    micro_f1 = f1_score(y_true, y_pred, labels=relation_labels, average="micro", zero_division=0)
+    macro_r = recall_score(y_true, y_pred, labels=relation_labels, average='macro', zero_division=0)
+    micro_f1 = f1_score(y_true, y_pred, labels=relation_labels, average='micro', zero_division=0)
 
     n_correct = sum(t == p for t, p in zip(y_true, y_pred, strict=True))
     accuracy = n_correct / len(y_true) if y_true else 0.0
 
     return {
-        "macro_f1": round(macro_f1 * 100, 2),
-        "macro_precision": round(macro_p * 100, 2),
-        "macro_recall": round(macro_r * 100, 2),
-        "micro_f1": round(micro_f1 * 100, 2),
-        "accuracy": round(accuracy * 100, 2),
+        'macro_f1': round(macro_f1 * 100, 2),
+        'macro_precision': round(macro_p * 100, 2),
+        'macro_recall': round(macro_r * 100, 2),
+        'micro_f1': round(micro_f1 * 100, 2),
+        'accuracy': round(accuracy * 100, 2),
     }
 
 
@@ -88,13 +89,13 @@ def print_results_table(results: dict[str, dict[str, float]]) -> None:
         results: Mapping from model name to its metrics dict
             (as returned by :func:`compute_metrics`).
     """
-    header = f"{'Model':<30} {'Macro F1':>10} {'Micro F1':>10} {'Accuracy':>10}"
+    header = f'{"Model":<30} {"Macro F1":>10} {"Micro F1":>10} {"Accuracy":>10}'
     print(header)
-    print("-" * len(header))
+    print('-' * len(header))
     for model_name, metrics in results.items():
         print(
-            f"{model_name:<30} "
-            f"{metrics.get('macro_f1', 0):>10.2f} "
-            f"{metrics.get('micro_f1', 0):>10.2f} "
-            f"{metrics.get('accuracy', 0):>10.2f}"
+            f'{model_name:<30} '
+            f'{metrics.get("macro_f1", 0):>10.2f} '
+            f'{metrics.get("micro_f1", 0):>10.2f} '
+            f'{metrics.get("accuracy", 0):>10.2f}'
         )
