@@ -105,6 +105,7 @@ def main() -> None:
         model = BaselineREModel(
             model_name=model_name,
             num_labels=len(label2id),
+            tokenizer_vocab_size=len(tokenizer),
             dropout=cfg['model'].get('dropout', 0.1),
         )
 

@@ -28,12 +28,15 @@ class BaselineREModel(nn.Module):
         self,
         model_name: str,
         num_labels: int,
+        tokenizer_vocab_size: int | None = None,
         dropout: float = 0.1,
     ) -> None:
         """Initialise encoder and classification head."""
         super().__init__()
         config = AutoConfig.from_pretrained(model_name)
         self.encoder = AutoModel.from_pretrained(model_name, config=config)
+        if tokenizer_vocab_size is not None:
+            self.encoder.resize_token_embeddings(tokenizer_vocab_size)
         self.dropout = nn.Dropout(dropout)
         self.classifier = nn.Linear(config.hidden_size, num_labels)
 
