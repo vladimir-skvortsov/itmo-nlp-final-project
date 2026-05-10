@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import torch
-import wandb
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 from transformers import get_linear_schedule_with_warmup
 
+import wandb
 from nerel_re.evaluation.metrics import compute_metrics
 
 if TYPE_CHECKING:
@@ -210,12 +210,15 @@ class RETrainer:
             sampler = WeightedRandomSampler(sample_weights, num_samples=len(dataset))
             shuffle = False
 
+        # MPS does not support multiprocessing DataLoader; CUDA benefits from 2-4 workers
+        num_workers = 0 if self.device.type == 'mps' else 2
         return DataLoader(
             dataset,
             batch_size=self.config.batch_size,
             shuffle=shuffle,
             sampler=sampler,
-            num_workers=0,  # MPS does not support multiprocessing DataLoader
+            num_workers=num_workers,
+            pin_memory=self.device.type == 'cuda',
         )
 
     def _make_optimizer(self) -> AdamW:

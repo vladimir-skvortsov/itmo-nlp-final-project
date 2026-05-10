@@ -35,6 +35,7 @@ checkpoints/
 
 # WandB
 wandb/
+.coverage
 
 # Secrets
 .env
