@@ -3,7 +3,7 @@ name = "nerel-re"
 version = "0.1.0"
 description = "Relation Extraction on Russian NEREL corpus: DeBERTa + Typed Entity Markers"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "torch>=2.3.0",
     "transformers>=4.44.0",
@@ -34,7 +34,7 @@ build-backend = "hatchling.build"
 packages = ["src/nerel_re"]
 
 [tool.ruff]
-target-version = "py314"
+target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
