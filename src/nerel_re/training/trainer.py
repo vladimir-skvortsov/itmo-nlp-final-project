@@ -211,14 +211,15 @@ class RETrainer:
             shuffle = False
 
         # MPS does not support multiprocessing DataLoader; CUDA benefits from 2-4 workers
-        num_workers = 0 if self.device.type == 'mps' else 2
+        device_str = str(self.device)
+        num_workers = 0 if device_str.startswith('mps') else 2
         return DataLoader(
             dataset,
             batch_size=self.config.batch_size,
             shuffle=shuffle,
             sampler=sampler,
             num_workers=num_workers,
-            pin_memory=self.device.type == 'cuda',
+            pin_memory=device_str.startswith('cuda'),
         )
 
     def _make_optimizer(self) -> AdamW:
