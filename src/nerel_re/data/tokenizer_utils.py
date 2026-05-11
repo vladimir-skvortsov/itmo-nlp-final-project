@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import torch
+
 if TYPE_CHECKING:
     from transformers import BatchEncoding, PreTrainedTokenizerBase
 
@@ -147,10 +149,16 @@ def encode_example(
         obj_type=example.entity2.type,
         use_typed_markers=use_typed_markers,
     )
-    return tokenizer(
+    encoding = tokenizer(
         marked_text,
         max_length=max_length,
         padding='max_length',
         truncation=True,
         return_tensors='pt',
     )
+    if use_typed_markers:
+        subj_marker = SUBJ_START_TMPL.format(type=example.entity1.type)
+        obj_marker = OBJ_START_TMPL.format(type=example.entity2.type)
+        encoding['subj_marker_ids'] = torch.tensor([tokenizer.convert_tokens_to_ids(subj_marker)])
+        encoding['obj_marker_ids'] = torch.tensor([tokenizer.convert_tokens_to_ids(obj_marker)])
+    return encoding
