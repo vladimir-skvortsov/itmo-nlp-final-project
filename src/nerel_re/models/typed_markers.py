@@ -71,7 +71,11 @@ class TypedMarkersREModel(nn.Module):
         """Initialise encoder, resize embeddings, build classification head."""
         super().__init__()
         config = AutoConfig.from_pretrained(model_name)
-        self.encoder = AutoModel.from_pretrained(model_name, config=config)
+        # Load in float32 explicitly: DeBERTa-v3 can produce NaN on GPU
+        # when running in mixed precision due to overflow in XSoftmax.
+        self.encoder = AutoModel.from_pretrained(
+            model_name, config=config, torch_dtype=torch.float32
+        )
         self.encoder.resize_token_embeddings(tokenizer_vocab_size)
 
         hidden = config.hidden_size
@@ -135,8 +139,7 @@ class TypedMarkersREModel(nn.Module):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
         )
-        # DeBERTa-v3 may return float16 on GPU; cast to float32 for the classifier.
-        hidden_states = outputs.last_hidden_state.float()  # (batch, seq, hidden)
+        hidden_states = outputs.last_hidden_state  # (batch, seq, hidden) — float32
 
         batch_size = input_ids.size(0)
 
