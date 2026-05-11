@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 
 if TYPE_CHECKING:
-    from transformers import BatchEncoding, PreTrainedTokenizerBase
+    from transformers import BatchEncoding, PreTrainedTokenizer
 
     from nerel_re.data.dataset import RelationExample
 
@@ -120,32 +120,88 @@ def mark_entities(
     return text
 
 
+def _extract_entity_window(
+    text: str,
+    e1_start: int,
+    e1_end: int,
+    e2_start: int,
+    e2_end: int,
+    context_chars: int = 300,
+) -> tuple[str, int, int, int, int]:
+    """Extract a character window centred around both entity spans.
+
+    Guarantees both entities are always present in the returned window,
+    preventing entity markers from being silently truncated when documents
+    are longer than ``max_length`` tokens.
+
+    Args:
+        text: Full document text.
+        e1_start: Character start of entity 1.
+        e1_end: Character end of entity 1.
+        e2_start: Character start of entity 2.
+        e2_end: Character end of entity 2.
+        context_chars: Characters of context to keep on each side of the
+            outermost entity boundary (default 300 ≈ 100 wordpiece tokens).
+
+    Returns:
+        Tuple of ``(windowed_text, adj_e1_start, adj_e1_end, adj_e2_start,
+        adj_e2_end)`` with offsets adjusted to the window.
+    """
+    span_start = min(e1_start, e2_start)
+    span_end = max(e1_end, e2_end)
+    window_start = max(0, span_start - context_chars)
+    window_end = min(len(text), span_end + context_chars)
+    offset = window_start
+    return (
+        text[window_start:window_end],
+        e1_start - offset,
+        e1_end - offset,
+        e2_start - offset,
+        e2_end - offset,
+    )
+
+
 def encode_example(
     example: RelationExample,
-    tokenizer: PreTrainedTokenizerBase,
+    tokenizer: PreTrainedTokenizer,
     max_length: int = 256,
     *,
     use_typed_markers: bool = True,
+    context_chars: int = 300,
 ) -> BatchEncoding:
     """Tokenize a :class:`RelationExample` with entity markers injected.
+
+    A character window of ``context_chars`` is extracted around both entity
+    spans before tokenisation so that entity markers are never truncated away,
+    which is critical for the typed-markers architecture.
 
     Args:
         example: The relation extraction example to encode.
         tokenizer: A HuggingFace tokenizer with marker tokens already added.
         max_length: Maximum token sequence length (truncated/padded).
         use_typed_markers: Whether to use typed or plain entity markers.
+        context_chars: Context window in characters around the outermost entity
+            boundary (300 ≈ 100 wordpiece tokens of context per side).
 
     Returns:
         A :class:`BatchEncoding` containing ``input_ids``, ``attention_mask``,
         and optionally ``token_type_ids``.
     """
-    marked_text = mark_entities(
+    windowed_text, e1_start, e1_end, e2_start, e2_end = _extract_entity_window(
         text=example.sentence,
-        subj_start=example.entity1.start,
-        subj_end=example.entity1.end,
+        e1_start=example.entity1.start,
+        e1_end=example.entity1.end,
+        e2_start=example.entity2.start,
+        e2_end=example.entity2.end,
+        context_chars=context_chars,
+    )
+    marked_text = mark_entities(
+        text=windowed_text,
+        subj_start=e1_start,
+        subj_end=e1_end,
         subj_type=example.entity1.type,
-        obj_start=example.entity2.start,
-        obj_end=example.entity2.end,
+        obj_start=e2_start,
+        obj_end=e2_end,
         obj_type=example.entity2.type,
         use_typed_markers=use_typed_markers,
     )
@@ -159,6 +215,10 @@ def encode_example(
     if use_typed_markers:
         subj_marker = SUBJ_START_TMPL.format(type=example.entity1.type)
         obj_marker = OBJ_START_TMPL.format(type=example.entity2.type)
-        encoding['subj_marker_ids'] = torch.tensor([tokenizer.convert_tokens_to_ids(subj_marker)])
-        encoding['obj_marker_ids'] = torch.tensor([tokenizer.convert_tokens_to_ids(obj_marker)])
+        encoding['subj_marker_ids'] = torch.tensor(
+            [tokenizer.convert_tokens_to_ids(subj_marker)]
+        )
+        encoding['obj_marker_ids'] = torch.tensor(
+            [tokenizer.convert_tokens_to_ids(obj_marker)]
+        )
     return encoding
