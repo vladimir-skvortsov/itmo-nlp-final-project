@@ -135,7 +135,8 @@ class TypedMarkersREModel(nn.Module):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
         )
-        hidden_states = outputs.last_hidden_state  # (batch, seq, hidden)
+        # DeBERTa-v3 may return float16 on GPU; cast to float32 for the classifier.
+        hidden_states = outputs.last_hidden_state.float()  # (batch, seq, hidden)
 
         batch_size = input_ids.size(0)
 
