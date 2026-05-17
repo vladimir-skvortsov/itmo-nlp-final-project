@@ -1,0 +1,22 @@
+data:
+  data_dir: data/nerel/NEREL-v1.1
+  max_length: 256
+
+model:
+  name: xlm-roberta-large
+  dropout: 0.1
+
+training:
+  output_dir: output/ner_xlmr_tuned
+  num_epochs: 8
+  batch_size: 8
+  learning_rate: 7.0e-6
+  head_learning_rate: 7.0e-5
+  warmup_ratio: 0.10
+  weight_decay: 0.01
+  grad_clip: 1.0
+  seed: 42
+  log_every_n_steps: 100
+  eval_every_n_epochs: 1
+  wandb_project: nerel-ner
+  run_name: ner-xlmr-large-tuned
