@@ -1,25 +1,20 @@
 [project]
-name = "nerel-re"
+name = "nerel"
 version = "0.1.0"
-description = "Relation Extraction on Russian NEREL corpus: DeBERTa + Typed Entity Markers"
+description = "Fine-grained NER on the Russian NEREL corpus"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "torch>=2.3.0",
     "transformers>=4.44.0",
-    "datasets>=2.19.0",
     "pyyaml>=6.0.0",
     "wandb>=0.17.0",
-    "scikit-learn>=1.4.0",
+    "seqeval>=1.2.2",
     "numpy>=1.26.0",
-    "pandas>=2.2.0",
     "tqdm>=4.66.0",
-    "matplotlib>=3.9.0",
-    "seaborn>=0.13.0",
 ]
 
 [project.optional-dependencies]
-mlx = ["mlx-lm>=0.14.0"]
 dev = [
     "ruff>=0.4.0",
     "pytest>=8.0.0",
@@ -31,7 +26,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/nerel_re"]
+packages = ["src/nerel_ner"]
 
 [tool.ruff]
 target-version = "py312"
@@ -60,7 +55,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "scripts/*.py" = ["T201", "ANN", "D", "INP001", "PLC0415", "PTH123"]
 "tests/*.py" = ["S101", "ANN", "D", "PLR2004", "RUF001", "TC003"]
-"src/nerel_re/evaluation/metrics.py" = ["T201"]
+"src/nerel_ner/evaluation/metrics.py" = ["T201"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -71,4 +66,5 @@ indent-style = "space"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=src/nerel_re --cov-report=term-missing -v"
+pythonpath = ["src"]
+addopts = "--cov=src/nerel_ner --cov-report=term-missing -q"
