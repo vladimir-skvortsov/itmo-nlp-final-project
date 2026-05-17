@@ -8,11 +8,11 @@ model:
 
 training:
   output_dir: output/ner_deberta
-  num_epochs: 5
+  num_epochs: 15
   batch_size: 32
   learning_rate: 1.0e-5
   head_learning_rate: 1.0e-4
-  warmup_ratio: 0.06
+  warmup_ratio: 0.10
   weight_decay: 0.01
   grad_clip: 1.0
   seed: 42
