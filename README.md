@@ -11,7 +11,7 @@ Given a Russian sentence from the NEREL news wire corpus, predict a BIO tag sequ
 sub-word tokens covering 29 named entity types (Person, Organisation, Location, Country,
 City, Disease, Law, Money, Work\_of\_Art, etc.).
 
-**Dataset:** NEREL v1.1 — 907/101/100 train/dev/test documents, ~57 K entity mentions, 29 types.  
+**Dataset:** NEREL v1.1 — 907/101/100 train/dev/test documents, ~57 K entity mentions, 29 types.
 **Metrics:** Span-level Macro F1 (primary) and Micro F1 via `seqeval`.
 
 ## Results
