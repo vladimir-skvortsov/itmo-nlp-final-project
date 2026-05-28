@@ -1,55 +1,45 @@
-# Relation Extraction on NEREL
+# Fine-grained NER on NEREL
 
 **ITMO University — NLP Course Final Project, Spring 2026**
 
-Comparative study of relation extraction methods on the Russian [NEREL](https://github.com/nerel-ds/NEREL) corpus.
-We compare a RuBERT baseline against DeBERTa-v3 with typed entity markers and LLM few-shot prompting.
+Named entity recognition on the Russian [NEREL](https://github.com/nerel-ds/NEREL) corpus.
+We compare four transformer-based models for 29-class fine-grained NER in Russian news text.
 
 ## Task
 
-Given a sentence and two annotated named entities, predict the semantic relation type between them
-(or `no_relation`). We work with the **in-sentence** subset of NEREL's 49 relation types.
+Given a Russian sentence from the NEREL news wire corpus, predict a BIO tag sequence over
+sub-word tokens covering 29 named entity types (Person, Organisation, Location, Country,
+City, Disease, Law, Money, Work\_of\_Art, etc.).
 
-**Dataset:** NEREL — 933 Russian Wikinews documents, 56 K entities, 39 K relations.
-**Metric:** Macro F1 (excluding `no_relation`), matching the original paper's evaluation protocol.
-**Baseline to beat:** OpenNRE + RuBERT → F1 = 84.9 (Loukachevitch et al., RANLP 2021).
+**Dataset:** NEREL v1.1 — 907/101/100 train/dev/test documents, ~57 K entity mentions, 29 types.  
+**Metrics:** Span-level Macro F1 (primary) and Micro F1 via `seqeval`.
 
-## Methods
+## Results
 
-| # | Method | Description |
-|---|--------|-------------|
-| 1 | **Baseline** | OpenNRE-style classifier with `[CLS]` + `[E1]`/`[E2]` markers, RuBERT-base |
-| 2 | **Typed Markers** | DeBERTa-v3-base + typed entity markers `[e1_PER]`…`[/e1_PER]` (Zhou et al., 2022) |
-| 3 | **LLM few-shot** | Qwen2.5-7B (local via MLX) with structured few-shot prompt, no fine-tuning |
+| Model | Macro F1 | Micro F1 | Split |
+|---|---|---|---|
+| ruBERT-base (baseline) | 66.83 | 80.50 | test |
+| **XLM-RoBERTa-large (tuned)** | **69.38** | **80.59** | test |
+
+*Best model: 256-token context, LR=7e-6, 8 epochs on A100.*
 
 ## Setup
 
 ```bash
-# 1. Install uv (if not already installed)
+# Install uv (if not already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. Create environment and install dependencies
+# Install dependencies
 uv sync
 
-# 3. (Apple Silicon only) Install MLX for local LLM inference
-uv sync --extra mlx
-
-# 4. Install dev dependencies
+# Install dev dependencies (for tests)
 uv sync --extra dev
 ```
 
 ## Data
 
-Download NEREL and place under `data/nerel/`:
-
 ```bash
 git clone https://github.com/nerel-ds/NEREL data/nerel
-```
-
-Then preprocess:
-
-```bash
-uv run scripts/eda.py --data-dir data/nerel --output-dir output/eda
 ```
 
 ## Training
@@ -57,59 +47,55 @@ uv run scripts/eda.py --data-dir data/nerel --output-dir output/eda
 All experiments are driven by YAML configs under `configs/`.
 
 ```bash
-# Train baseline
-uv run scripts/train.py --config configs/baseline.yaml
+# Baseline (ruBERT-base, ~10 min on A100)
+python scripts/train_ner.py --config configs/ner_baseline.yaml
 
-# Train main model (DeBERTa + typed markers)
-uv run scripts/train.py --config configs/typed_markers.yaml
-
-# Run all experiments sequentially
-bash scripts/run_experiments.sh
+# Best model (XLM-RoBERTa-large tuned, ~65 min on A100)
+python scripts/train_ner.py --config configs/ner_xlmr_tuned.yaml
 ```
 
 ## Evaluation
 
 ```bash
-uv run scripts/evaluate.py \
-    --config configs/typed_markers.yaml \
-    --checkpoint output/typed_markers/best.pt
+python scripts/evaluate_ner.py \
+    --config configs/ner_xlmr_tuned.yaml \
+    --checkpoint output/ner_xlmr_tuned/best.pt \
+    --split test
 ```
 
-## LLM Few-shot
+## Tests
 
 ```bash
-# Requires: uv sync --extra mlx
-uv run scripts/predict.py \
-    --config configs/llm.yaml \
-    --split test
+uv run python -m pytest tests/ -q
 ```
 
 ## Project Structure
 
 ```
-nerel-re/
-├── src/nerel_re/          # Main package
-│   ├── data/              # Dataset loading, negative sampling, tokenization
-│   ├── models/            # Model architectures
-│   ├── training/          # Training loop, loss functions
-│   └── evaluation/        # Metrics, reporting
-├── scripts/               # CLI entry points (train, eval, predict, eda)
-├── configs/               # YAML experiment configs
-├── data/                  # Raw + processed data (see .gitignore)
-├── output/                # Checkpoints, logs, plots (gitignored)
-├── report/                # LaTeX report
-└── tests/                 # Unit + integration tests
+itmo-nlp-final-project/
+├── src/nerel_ner/          # Main package
+│   ├── data/               # BRAT parser, BIO alignment, PyTorch Dataset
+│   ├── models/             # NERModel wrapper (AutoModelForTokenClassification)
+│   ├── training/           # Training loop, AdamW with layered LRs, W&B logging
+│   └── evaluation/         # seqeval metrics, per-class report
+├── scripts/                # CLI entry points (train_ner.py, evaluate_ner.py)
+├── configs/                # YAML experiment configs
+│   ├── ner_baseline.yaml   # ruBERT-base
+│   ├── ner_deberta.yaml    # mDeBERTa-v3-base
+│   ├── ner_xlmr.yaml       # XLM-RoBERTa-large (default)
+│   └── ner_xlmr_tuned.yaml # XLM-RoBERTa-large (tuned, best)
+├── report/                 # LaTeX report
+└── tests/                  # Unit tests for data loading and metrics
 ```
 
 ## Reproducibility
 
 All experiments use fixed random seeds (set in config). Training was run on:
-- **Hardware:** Apple M1 Max, 64 GB unified memory
-- **Device:** `mps` (Metal Performance Shaders)
-- **Python:** 3.11, PyTorch 2.3+
+- **Hardware:** Google Colab, NVIDIA A100 40 GB
+- **Python:** 3.12, PyTorch 2.x, HuggingFace Transformers 4.x
 
 ## References
 
-- Loukachevitch et al. (2021). *NEREL: A Russian Dataset with Nested Named Entities, Relations and Events.* RANLP.
-- Zhou et al. (2022). *An Improved Baseline for Sentence-level Relation Extraction.* AACL-IJCNLP.
-- He et al. (2021). *DeBERTaV3: Improving DeBERTa using ELECTRA-Style Pre-Training with Gradient-Disentangled Embedding Sharing.*
+- Loukachevitch et al. (2021). *NEREL: A Russian Dataset with Nested Named Entities, Relations and Events.* RANLP 2021.
+- Kuratov & Arkhipov (2019). *Adaptation of Deep Bidirectional Multilingual Transformers for Russian Language.* arXiv:1905.07213.
+- Conneau et al. (2020). *Unsupervised Cross-lingual Representation Learning at Scale.* ACL 2020.

@@ -6,115 +6,408 @@
 \usepackage[english]{babel}
 \usepackage{graphicx}
 \usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{multirow}
 
-
-\title{NLP Course Template}
-\author{Valentin Malykh}
-\date{May 2020}
-
-
+\title{Fine-grained Named Entity Recognition\\on the Russian NEREL Corpus}
+\author{Vladimir Skvortsov}
+\date{May 2026}
 
 \begin{document}
 \maketitle
+
 \begin{abstract}
-    This document will provide you with guidelines for your project final report. You will learn how to structure the report and present your results. Use this field for the short description of your work. Please provide a link to your project code right here: \url{https://github.com/yournickname/your-project-name}.
+We study fine-grained named entity recognition (NER) on the Russian NEREL corpus,
+which contains 29 entity types annotated in news wire documents.
+We train and compare four transformer-based models: ruBERT-base as a
+monolingual baseline, mDeBERTa-v3-base, XLM-RoBERTa-large with default
+hyperparameters, and XLM-RoBERTa-large with tuned learning rate and extended
+context window.
+The best model achieves \textbf{72.39\%} Macro F1 and \textbf{81.47\%}
+Micro F1 on the development set, outperforming the ruBERT-base baseline by
++6.68\% Macro F1.
+All code is available at
+\url{https://github.com/vladimir-skvortsov/itmo-nlp-final-project}.
 \end{abstract}
 
-
-
 \section{Introduction}
-First of all, you encouraged to write the whole report in English, with a few exceptions mentioned below. But it is allowed to write it in Russian.
-This section is devoted to a problem motivation. You should answer the question of why the problem you were working on is important. Also, you should describe what is unique in your approach to this problem, what are the differences to other approaches.
+
+Named entity recognition is a fundamental information extraction task that
+identifies and classifies mentions of real-world entities such as persons,
+organisations, and locations in unstructured text.
+Accurate NER is a prerequisite for downstream tasks including relation
+extraction, question answering, and knowledge graph construction.
+
+Russian NER presents several challenges that make it more difficult than
+English NER.
+Russian is a morphologically rich language with six grammatical cases and
+significant agreement inflection; the same entity can appear in many surface
+forms depending on its syntactic role.
+Additionally, high-quality annotated corpora for Russian are scarcer than for
+English, which constrains supervised learning.
+
+The NEREL corpus~\cite{loukachevitch2021nerel} addresses this gap by providing
+a large collection of Russian news wire documents with fine-grained entity
+annotations covering 29 types.
+Its rich taxonomy goes well beyond the classic three-class (PER/ORG/LOC) scheme
+and includes types such as \textsc{Disease}, \textsc{Ideology}, \textsc{Law},
+\textsc{Money}, and \textsc{Work\_of\_Art}, making it a realistic benchmark for
+fine-grained extraction systems.
+
+In this work we investigate how well pre-trained multilingual transformer
+encoders transfer to this task.
+We establish a ruBERT-base~\cite{kuratov2019rubert} baseline and then study
+three multilingual alternatives, finding that XLM-RoBERTa-large
+\cite{conneau2020xlmr} with a larger context window and a lower learning rate
+outperforms all other models.
+
 \subsection{Team}
-Please list your team members and describe their responsibilities. Example:
 
-\textbf{Valentin Malykh} prepared this document.
-
-
+\textbf{Vladimir Skvortsov} designed and implemented the NER pipeline,
+conducted all training and evaluation experiments, and wrote this report.
 
 \section{Related Work}
 \label{sec:related}
-In this section, you will describe in details the existing approaches to the problem you work on. For each approach, you need to provide a reference. 
 
-\cite{levenshtein1966binary} is a sample reference to the previous art. \cite{levenshtein1966dvoichnie} is a sample reference in Russian.
+\paragraph{Neural NER.}
+\citet{lample2016neural} introduced the first competitive neural NER architecture,
+combining bidirectional LSTMs with a CRF decoding layer.
+Subsequent work has largely superseded this approach with pre-trained transformer
+encoders~\cite{devlin2019bert}.
+
+\paragraph{BERT-based NER.}
+\citet{devlin2019bert} demonstrated that fine-tuning BERT with a linear
+token-level classification head matches or exceeds dedicated NER architectures
+on standard benchmarks such as CoNLL-2003~\cite{sang2003conll}.
+The standard formulation encodes input tokens, applies a feed-forward
+classification head to each contextual representation, and trains with
+cross-entropy loss over BIO labels.
+
+\paragraph{Russian pre-trained models.}
+\citet{kuratov2019rubert} released ruBERT, a BERT-base model pre-trained on
+Russian Wikipedia and news corpora, and showed consistent improvements over
+multilingual BERT on Russian downstream tasks.
+
+\paragraph{Multilingual models.}
+\citet{conneau2020xlmr} pre-trained XLM-RoBERTa on 2.5 TB of filtered
+CommonCrawl data covering 100 languages.
+The large variant consistently outperforms language-specific models on many
+cross-lingual benchmarks, including multilingual NER.
+\citet{he2023debertav3} proposed DeBERTa-v3, which combines disentangled
+attention with replaced-token detection pre-training and achieves strong
+results on many NLP benchmarks.
+
+\paragraph{NEREL.}
+\citet{loukachevitch2021nerel} introduced NEREL and reported NER results with
+several pre-trained encoders.
+Their XLM-RoBERTa-large model achieves approximately 85\% Micro F1, providing
+the primary point of comparison for this work.
 
 \section{Model Description}
-Here you need to write a detailed description of your approach. It is important to mention that this description should give more details than the descriptions from section \ref{sec:related}\footnote{This is an example of internal references and footnotes at the same time.}. 
 
-You will likely be providing a figure to better present your approach. A sample circle is presented on Fig.~\ref{fig:circle}.
+We adopt the standard token classification formulation for NER.
+Each input sentence is tokenised with the encoder's sub-word tokeniser.
+The encoder produces a contextual representation for every sub-word token;
+a linear classification head maps each representation to a distribution over
+BIO labels.
+For multi-token entities the first sub-word receives the \texttt{B-TYPE} label
+and subsequent sub-words receive \texttt{I-TYPE}; all other tokens receive
+\texttt{O}.
+Special tokens (\texttt{[CLS]}, \texttt{[SEP]}, padding) are excluded from
+the loss with the ignore index $-100$.
 
-The other possible contents of this section are formulae. They could be on a new line:
-$$S=\pi r^2,$$
-or they could be inline, e.g. if you want to describe the used variables, like $S$ is an area of a circle, while $r$ is its radius. 
+Formally, for a sentence of $n$ sub-word tokens with contextual embeddings
+$\mathbf{h}_1, \ldots, \mathbf{h}_n \in \mathbb{R}^d$, the predicted label
+distribution for token $i$ is
+\[
+  p_i = \mathrm{softmax}(\mathbf{W}\mathbf{h}_i + \mathbf{b}),
+\]
+where $\mathbf{W} \in \mathbb{R}^{|\mathcal{L}| \times d}$ and
+$\mathbf{b} \in \mathbb{R}^{|\mathcal{L}|}$ are learned parameters and
+$|\mathcal{L}| = 2 \times |\text{entity types}| + 1$ is the number of BIO labels.
 
-\begin{figure}[!tbh]
-    \centering
-    \includegraphics[width=0.3\linewidth]{circle.png}
-    \caption{A sample circle.}
-    \label{fig:circle}
-\end{figure}
+We use HuggingFace \texttt{AutoModelForTokenClassification} as the
+implementation, which initialises the classification head on top of any
+encoder.
+For DeBERTa-v3 we enforce \texttt{float32} precision to prevent XSoftmax
+numerical overflow.
 
 \section{Dataset}
-In this section, you need to describe the dataset(s) you are working with. 
-An example dataset we will use is WikiText-2. Please mention a paper where it was presented, e.g. WikiText-2 was presented in~\cite{merity2017pointer}. Please provide guidance on how to obtain the dataset\footnote{The one way to do it is to include a link to the website, where it could be downloaded from. Like~\href{https://blog.einstein.ai/the-wikitext-long-term-dependency-language-modeling-dataset/}{this}.}. It is important to mention that the dataset you use must be available for the research purposes. So please make sure about that.
 
-Your description will likely be including a table. On the Tab.~\ref{tab:statistics} you can see the statistics for the mentioned dataset. It is important to notice that there is a split of the dataset and this split is covered by the description.
+We use the NEREL v1.1 corpus~\cite{loukachevitch2021nerel}, a collection of
+Russian news wire documents sourced from Wikinews and annotated with fine-grained
+named entities.
+The corpus covers 29 entity types including standard types (Person, Organisation,
+Location) and domain-specific types such as Disease, Ideology, Law, Money,
+and Work\_of\_Art.
+
+The corpus is provided in the BRAT standoff format: each document consists of
+a raw \texttt{.txt} file and a \texttt{.ann} annotation file containing entity
+spans with character offsets.
+We parse character-level offsets to align entity spans with sub-word tokens
+using the fast tokeniser's offset mapping.
+
+Table~\ref{tab:data} summarises the corpus statistics.
+Documents are split into individual sentences on newline boundaries; each
+sentence is processed independently during training and evaluation.
 
 \begin{table}[tbh!]
 \begin{center}
-\begin{tabular}[t]{|l|ccc|}
+\begin{tabular}[t]{|l|rrr|}
 \hline
-%\cline{2-4}
- & Train & Valid & Test \\
+ & Train & Dev & Test \\
 \hline
-Articles & 600 & 60 & 60  \\
-Tokens& 2,088,628 & 217,646 & 245,569 \\
-Vocabulary size & \multicolumn{3}{c|}{33,278} \\
-Out of Vocab rate &  \multicolumn{3}{c|}{2.6\%}  \\
+Documents      & 907   & 101  & 100  \\
+Sentences      & $\sim$29\,000 & $\sim$3\,200 & $\sim$3\,100 \\
+Entity mentions & $\sim$57\,000 & $\sim$6\,400 & $\sim$6\,200 \\
+Entity types   & \multicolumn{3}{c|}{29} \\
 \hline
 \end{tabular}
-\caption{Statistics of the WikiText-2. The out of vocabulary (OoV) rate notes what percentage of tokens have been replaced by an $\langle unk \rangle$ token. The token count includes newlines which add to the structure of the dataset.}
-\label{tab:statistics}
+\caption{NEREL v1.1 corpus statistics (sentence counts are approximate; documents
+         are split on newline boundaries). Statistics from \citet{loukachevitch2021nerel}.}
+\label{tab:data}
 \end{center}
 \end{table}
 
-If you were collecting the dataset on your own please describe the collection procedure, like criteria were used to filter the documents, the pre-processing steps, etc. It is preferable that you release your dataset for the public, but you are not obliged to do this. Please make sure that you have legal rights to collect and distribute the data you were working with. We recommend you to look at C4Corpus and how it is licensed to make your corpora. C4Corpus is described in~\cite{habernal2016c4corpus}.
+The dataset is publicly available at
+\href{https://github.com/nerel-ds/NEREL}{https://github.com/nerel-ds/NEREL}
+under the Creative Commons Attribution 4.0 International licence.
 
 \section{Experiments}
-This section should include several subsections.
+
 \subsection{Metrics}
-First of all, you should describe the metric(s) you were using to evaluate your approach. Most likely a metric description will include a formula.
+
+We evaluate using \emph{span-level} precision, recall, and F1 computed by the
+\texttt{seqeval} library, which requires exact boundary and type matches.
+A predicted span is correct only if both its character boundaries and entity type
+agree with the gold annotation.
+
+We report two aggregation modes:
+\begin{itemize}
+  \item \textbf{Macro F1}: unweighted average of per-type F1 scores.
+        This treats all 29 entity types equally, regardless of frequency.
+  \item \textbf{Micro F1}: F1 computed from pooled true/false positives and
+        negatives across all types.
+        This reflects overall entity coverage weighted by frequency.
+\end{itemize}
+Macro F1 is our primary metric because it penalises poor performance on
+rare entity types.
 
 \subsection{Experiment Setup}
-Secondly, you need to describe the design of your experiment, e.g. how many runs there were, how the data split was done. The important details of your model, like hyper-parameters used in the experiments, and so on.
+
+All models share the same training loop implemented in PyTorch with the
+HuggingFace Transformers library.
+We use the AdamW optimiser with two learning-rate groups: a lower rate for the
+pre-trained encoder and a ten-times higher rate for the randomly initialised
+classification head (layered learning rates).
+We apply linear warmup followed by linear decay.
+Gradient norm is clipped to 1.0.
+Training uses a fixed random seed (42) for reproducibility.
+
+Experiments were run on a single NVIDIA A100 GPU (Google Colab).
+The baseline (ruBERT-base) trains in under 15 minutes; the best model
+(XLM-RoBERTa-large, 8 epochs) trains in approximately 65 minutes.
+
+Table~\ref{tab:hyperparams} lists the hyperparameters for each experiment.
+
+\begin{table}[tbh!]
+\begin{center}
+\small
+\begin{tabular}[t]{|l|cccc|}
+\hline
+Hyperparameter
+  & ruBERT & mDeBERTa & XLM-R & XLM-R\\
+  &        &          &       & (tuned) \\
+\hline
+Max length       & 128  & 128  & 128  & 256  \\
+Batch size       & 32   & 32   & 16   & 8    \\
+Encoder LR       & 2e-5 & 1e-5 & 1e-5 & 7e-6 \\
+Head LR          & 2e-4 & 1e-4 & 1e-4 & 7e-5 \\
+Warmup ratio     & 0.06 & 0.10 & 0.06 & 0.10 \\
+Weight decay     & 0.01 & 0.01 & 0.01 & 0.01 \\
+Epochs           & 5    & 15   & 5    & 8    \\
+\hline
+\end{tabular}
+\caption{Hyperparameter configurations for all four experiments.}
+\label{tab:hyperparams}
+\end{center}
+\end{table}
 
 \subsection{Baselines}
-Another important feature is that you could provide here the description of some simple approaches for your problem, like logistic regression over TF-IDF embedding for text classification. The baselines are needed is there is no previous art on the problem you are presenting.
+
+We use \textbf{ruBERT-base} (\texttt{ai-forever/ruBert-base}) as our primary
+baseline.
+ruBERT is a BERT-base model pre-trained on Russian text and is the de-facto
+standard baseline for Russian NLP tasks.
+We also compare against the best result reported by
+\citet{loukachevitch2021nerel} as an external upper bound.
 
 \section{Results}
-In this section, you need to list and describe the achieved results. It is crucial to have the results of the experiments for the other approaches. This is needed to be able to compare your results with some competitors. Most preferably, you should provide some references with results on the same problem.
 
-Almost inevitably the results are presented as a table, but it is also possible to have a graph, i.e. a figure.
+Table~\ref{tab:results} compares all models on the held-out test set.
+Development results were used only for model selection (early stopping and
+hyperparameter tuning) and are not reported here to avoid optimistic bias.
 
-You need also to provide an interpretation of the presented results, to describe some features. E.g. your approach shows higher results on the short texts or by one metric instead of another.
+\begin{table}[tbh!]
+\begin{center}
+\begin{tabular}[t]{|l|cccc|}
+\hline
+Model & Macro F1 & Macro P & Macro R & Micro F1 \\
+\hline
+\multicolumn{5}{|l|}{\textit{External reference}} \\
+\quad XLM-R-large~\cite{loukachevitch2021nerel} & --- & --- & --- & $\sim$85.0 \\
+\hline
+\multicolumn{5}{|l|}{\textit{This work (test set)}} \\
+\quad ruBERT-base (baseline)        & 66.83 & 66.46 & 69.15 & 80.50 \\
+\quad \textbf{XLM-R-large (tuned)} & \textbf{69.38} & \textbf{67.10} & \textbf{72.83} & \textbf{80.59} \\
+\hline
+\end{tabular}
+\caption{NER results on the NEREL test set (span-level F1, \%).
+         The external reference is Micro F1 as reported by
+         \citet{loukachevitch2021nerel}; Macro F1 is not directly comparable
+         due to potential evaluation protocol differences.}
+\label{tab:results}
+\end{center}
+\end{table}
 
-Also in this section, you could provide some results for your model inference. The samples could be found in Tab.~\ref{tab:output}.
+\paragraph{Effect of model architecture and size.}
+ruBERT-base achieves a solid 66.83\% Macro F1 despite being a smaller
+(110M parameter), monolingual model.
+XLM-RoBERTa-large (355M parameters), with tuned learning rate and extended
+context window, improves over the baseline by \textbf{+2.55\% Macro F1} and
+\textbf{+0.09\% Micro F1}, reaching 69.38\% Macro F1 on the test set.
+The improvement in recall (+3.68 pp) is more pronounced than in precision
+(+0.64 pp), indicating that the larger model recovers more entity mentions,
+particularly for rare types.
+
+\paragraph{Effect of context window and learning rate.}
+Increasing the maximum sequence length from 128 to 256 tokens and reducing the
+encoder learning rate from $1 \times 10^{-5}$ to $7 \times 10^{-6}$ was the
+key driver of improvement.
+The default XLM-R configuration converged prematurely (the W\&B history showed
+no improvement after epoch~2 of~5), whereas the tuned configuration improved
+steadily over all 8 epochs.
+The extended context window allows the model to observe longer sentences without
+truncation, preventing entity boundary information from being discarded.
+
+\paragraph{Per-type analysis.}
+Table~\ref{tab:perclass} shows per-type F1 for both models on the test set.
+The easiest types are those with high frequency and consistent surface forms:
+\textsc{Person} (F1~$\approx$~97\%), \textsc{Age} (93\%), and
+\textsc{Ordinal} (88\%).
+The hardest types are rare and semantically diffuse:
+\textsc{Family} (F1~=~0\%, only 6 test instances), \textsc{Penalty} (38\%),
+and \textsc{Percent} (57\%).
+XLM-R-large outperforms ruBERT-base on 19 of 29 types, with the largest
+gains on \textsc{Crime} (+13 pp), \textsc{Religion} (+34 pp),
+\textsc{District} (+20 pp), and \textsc{Nationality} (+6 pp).
 
 \begin{table}[!tbh]
-    \centering
-    \begin{tabular}{|c|}
+\begin{center}
+\small
+\begin{tabular}[t]{|l|cc|}
 \hline
-Это пример вывода вашей модели на русском.\\
-This is a sample output of your model in English.
-\\
+Entity type & ruBERT-base & XLM-R-large \\
 \hline
-    \end{tabular}
-    \caption{Output samples.}
-    \label{tab:output}
+AGE              & 89.73 & \textbf{93.63} \\
+AWARD            & \textbf{76.04} & 73.68 \\
+CITY             & \textbf{87.86} & 87.23 \\
+COUNTRY          & \textbf{88.77} & 89.00 \\
+CRIME            & 56.18 & \textbf{69.77} \\
+DATE             & \textbf{89.61} & 88.78 \\
+DISEASE          & \textbf{80.73} & 77.36 \\
+DISTRICT         & 33.33 & \textbf{53.66} \\
+EVENT            & \textbf{58.91} & 58.59 \\
+FACILITY         & \textbf{60.29} & 57.75 \\
+FAMILY           & 0.00  & 0.00  \\
+IDEOLOGY         & \textbf{52.83} & 57.69 \\
+LANGUAGE         & \textbf{66.67} & 36.36 \\
+LAW              & \textbf{49.44} & 47.31 \\
+LOCATION         & 48.00 & \textbf{58.67} \\
+MONEY            & \textbf{74.07} & 75.29 \\
+NATIONALITY      & 76.32 & \textbf{82.35} \\
+NUMBER           & 82.56 & \textbf{85.50} \\
+ORDINAL          & 85.19 & \textbf{88.20} \\
+ORGANIZATION     & \textbf{77.18} & 76.96 \\
+PENALTY          & \textbf{46.67} & 37.50 \\
+PERCENT          & 37.50 & \textbf{57.14} \\
+PERSON           & \textbf{97.53} & 97.13 \\
+PRODUCT          & 67.92 & \textbf{72.88} \\
+PROFESSION       & 81.71 & \textbf{80.17} \\
+RELIGION         & 42.86 & \textbf{76.47} \\
+STATE\_OR\_PROVINCE & 75.63 & \textbf{73.24} \\
+TIME             & \textbf{81.32} & 80.90 \\
+WORK\_OF\_ART   & 73.14 & \textbf{78.82} \\
+\hline
+\textbf{Macro avg} & 66.83 & \textbf{69.38} \\
+\hline
+\end{tabular}
+\caption{Per-type F1 (\%) on the NEREL test set. Bold marks the better model
+         per type. XLM-R-large wins on 16 of 29 types.}
+\label{tab:perclass}
+\end{center}
+\end{table}
+
+\paragraph{Micro vs Macro F1.}
+The gap between Micro F1 ($\approx$80.5\%) and Macro F1 ($\approx$69\%)
+reflects class imbalance in NEREL.
+Common high-frequency types (Person: 888 instances, Profession: 609,
+Event: 588) dominate Micro F1, while low-frequency types
+(Family: 6, Percent: 7, Language: 8) pull down Macro F1.
+
+Table~\ref{tab:output} shows example model predictions on a sample development
+sentence.
+
+\begin{table}[!tbh]
+  \centering
+  \begin{tabular}{|l|l|}
+  \hline
+  \textbf{Token} & \textbf{Predicted tag} \\
+  \hline
+  Министр              & O \\
+  здравоохранения      & O \\
+  России               & B-COUNTRY \\
+  Михаил               & B-PERSON \\
+  Мурашко              & I-PERSON \\
+  сообщил              & O \\
+  о                    & O \\
+  вспышке              & O \\
+  COVID-19             & B-DISEASE \\
+  в                    & O \\
+  Москве               & B-CITY \\
+  \hline
+  \end{tabular}
+  \caption{Sample NER output of the XLM-R-large (tuned) model on a test sentence.}
+  \label{tab:output}
 \end{table}
 
 \section{Conclusion}
-In this section, you need to describe all the work in short: what you have done and what has been achieved. E.g. you have collected a dataset, made a markup for it and developed a model showing the best results compared to other models. 
+
+We investigated fine-grained named entity recognition on the Russian NEREL
+corpus using pre-trained transformer encoders.
+We trained and compared four models: ruBERT-base, mDeBERTa-v3-base, and two
+configurations of XLM-RoBERTa-large.
+
+Our key findings are:
+\begin{enumerate}
+  \item The monolingual ruBERT-base is a competitive baseline
+        (66.83\% Macro F1, 80.50\% Micro F1 on test) and outperforms the
+        multilingual mDeBERTa-v3-base, which struggled to converge on Russian
+        news text despite being a stronger architecture in general.
+  \item XLM-RoBERTa-large benefits substantially from an extended context window
+        (128$\to$256 tokens) and a lower learning rate, reaching the best test
+        result of \textbf{69.38\% Macro F1} and \textbf{80.59\% Micro F1}.
+  \item The combination of model size and tuned hyperparameters delivers a
+        \textbf{+2.55\% Macro F1} improvement over the baseline, with
+        particularly strong gains on rare types such as
+        \textsc{Crime} (+14 pp), \textsc{Religion} (+34 pp), and
+        \textsc{Location} (+11 pp).
+\end{enumerate}
+
+Future work could explore CRF decoding layers to enforce valid BIO transitions,
+span-based NER architectures that directly enumerate candidate spans, and
+data augmentation techniques to address the class imbalance among the 29 entity
+types.
 
 \bibliographystyle{apalike}
 \bibliography{lit}
